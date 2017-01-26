@@ -3,8 +3,6 @@ using UnityEngine;
 
 public class ScreenShaker : MonoBehaviour
 {
-    public static ScreenShaker Instance;
-
     private float _shake = 0;
     private float _shakeAmount = 0.2f;
     private float _dampingFactor = 15f;
@@ -12,19 +10,22 @@ public class ScreenShaker : MonoBehaviour
 
     private Vector3 _originalPos;
     private float _originalSize;
-
-    void Awake()
-    {
-        Instance = this;
-    }
-
+    
     void Start()
     {
-        _originalPos = transform.position;
+        _originalPos = Camera.main.transform.position;
         _originalSize = Camera.main.orthographicSize;
+
+        TimeController.Instance.OnToggle += Shake;
     }
 
-    IEnumerator UnscaledUpdate()
+    private void Shake()
+    {
+        _shake = 2f;
+        StartCoroutine(ShakeCoroutine());
+    }
+
+    private IEnumerator ShakeCoroutine()
     {
         while (_shake > 0)
         {
@@ -42,11 +43,5 @@ public class ScreenShaker : MonoBehaviour
                 _shake = 0.0f;
             }
         }
-    }
-
-    public void Shake()
-    {
-        _shake = 2f;
-        StartCoroutine(UnscaledUpdate());
     }
 }

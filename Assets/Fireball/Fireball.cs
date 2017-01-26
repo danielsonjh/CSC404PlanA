@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
+using UnityEngine.Networking;
 
-public class Fireball : MonoBehaviour
+public class Fireball : NetworkBehaviour
 {
     private const float Duration = 5f;
 
@@ -8,10 +9,13 @@ public class Fireball : MonoBehaviour
     
 	void Update ()
 	{
-	    _counter += Time.deltaTime;
-	    if (_counter > Duration)
+	    if (isServer)
 	    {
-	        Destroy(gameObject);
+	        _counter += Time.deltaTime;
+	        if (_counter > Duration)
+	        {
+	            NetworkServer.Destroy(gameObject);
+	        }
 	    }
 	}
 }
