@@ -3,16 +3,18 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public class PlayerController : NetworkBehaviour
+public class Player : NetworkBehaviour
 {
+    public static readonly string[] ControllerNames = { "PC", "J1" };
+
     public GameObject FireballPrefab;
 
     private const float MoveForce = 40f;
     private const float FireballSpeed = 10f;
 
+    private string _controllerName;
     private Vector3 _lookDir;
     private Vector3 _moveDir;
-
     private bool _move;
     private bool _shoot;
 
@@ -22,11 +24,19 @@ public class PlayerController : NetworkBehaviour
 	{
 	    if (isClient)
 	    {
-	        ClientScene.RegisterPrefab(FireballPrefab);
+	        _controllerName = ControllerNames[playerControllerId];
+	        Debug.Log("Adding Controller: " + _controllerName);
+            StartCoroutine(UnscaledUpdate());
             TimeController.Instance.OnToggle += OnTimeControllerToggleHandler;
-	        StartCoroutine(UnscaledUpdate());
+	        if (playerControllerId == 0)
+	        {
+                ClientScene.RegisterPrefab(FireballPrefab);
 
-            Debug.Log(string.Join(", ", Input.GetJoystickNames()));
+                if (Input.GetJoystickNames().Length > 0)
+	            {
+	                ClientScene.AddPlayer(1);
+	            }
+	        }
 	    }
 	}
 
@@ -67,14 +77,14 @@ public class PlayerController : NetworkBehaviour
     {
         if (isLocalPlayer && TimeController.Instance.IsFreeze)
         {
-            var h = Input.GetAxisRaw("Horizontal");
-            var v = Input.GetAxisRaw("Vertical");
+            var h = Input.GetAxisRaw("Horizontal_" + _controllerName);
+            var v = Input.GetAxisRaw("Vertical_" + _controllerName);
             var rawDir = new Vector3(h, 0, v);
             _lookDir = rawDir.normalized;
             _moveDir = rawDir.magnitude < 0.05f ? Vector3.zero : rawDir.normalized;
 
-            _move = Input.GetButtonDown("Fire1");
-            _shoot = Input.GetButtonDown("Fire2");
+            _move = Input.GetButtonDown("Move_" + _controllerName);
+            _shoot = Input.GetButtonDown("Fire_" + _controllerName);
         }
     }
 
