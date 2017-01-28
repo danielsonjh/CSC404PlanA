@@ -8,6 +8,7 @@ public class Player : NetworkBehaviour
     public static readonly string[] ControllerNames = { "PC", "J1" };
 
     public GameObject FireballPrefab;
+    public GameObject DirectionArrowPrefab;
 
     private const float MoveForce = 40f;
     private const float FireballSpeed = 10f;
@@ -18,27 +19,30 @@ public class Player : NetworkBehaviour
     private bool _move;
     private bool _shoot;
 
+    private GameObject _directionArrow;
+
     private Action _chosenAction;
 
-	void Start ()
-	{
-	    if (isClient)
-	    {
-	        _controllerName = ControllerNames[playerControllerId];
-	        Debug.Log("Adding Controller: " + _controllerName);
+    void Start ()
+    {
+        if (isClient)
+        {
+            _controllerName = ControllerNames[playerControllerId];
+            Debug.Log("Adding Controller: " + _controllerName);
             StartCoroutine(UnscaledUpdate());
             TimeController.Instance.OnToggle += OnTimeControllerToggleHandler;
-	        if (playerControllerId == 0)
-	        {
-                ClientScene.RegisterPrefab(FireballPrefab);
+            if (playerControllerId == 0)
+            {
+                RegisterPrefabs();
+                InitPrefabs();
 
                 if (Input.GetJoystickNames().Length > 0)
-	            {
-	                ClientScene.AddPlayer(1);
-	            }
-	        }
-	    }
-	}
+                {
+                    ClientScene.AddPlayer(1);
+                }
+            }
+        }
+    }
 
     void Update()
     {
@@ -51,9 +55,9 @@ public class Player : NetworkBehaviour
     }
 
     IEnumerator UnscaledUpdate()
-	{
-	    while (true)
-	    {
+    {
+        while (true)
+        {
             yield return new WaitForEndOfFrame();
 
             if (isLocalPlayer)
@@ -65,13 +69,37 @@ public class Player : NetworkBehaviour
                 }
 
                 if (_shoot)
-	            {
-	                CmdShoot(_lookDir);
+                {
+                    CmdShoot(_lookDir);
                     _shoot = false;
                 }
             }
         }
-	}
+    }
+
+    private void RegisterPrefabs()
+    {
+        ClientScene.RegisterPrefab(FireballPrefab);
+    }
+
+    private void InitPrefabs()
+    {
+        _directionArrow =  Instantiate(DirectionArrowPrefab, new Vector3(0 ,0 , 0), Quaternion.identity);
+        _directionArrow.transform.parent = gameObject.transform;
+        _directionArrow.GetComponent<MeshRenderer>().enabled = false;
+    }
+
+    private void PositionDirectionArrowForDirection(Vector3 direction) {
+
+        Transform arrowTransform = _directionArrow.GetComponent<Transform>();
+
+        Vector3 offset = new Vector3(0, 0, -0.2f); // Offset of arrow from player transform
+        float dist = 2.0f; // Distance of arrow away from player
+
+        // Did not use Transfor.RotateAround because it was being wonky
+        arrowTransform.localPosition = (direction + offset) * dist;
+        arrowTransform.rotation = Quaternion.LookRotation(-1 * direction);
+    }
 
     private void ProcessInput()
     {
@@ -82,9 +110,18 @@ public class Player : NetworkBehaviour
             var rawDir = new Vector3(h, 0, v);
             _lookDir = rawDir.normalized;
             _moveDir = rawDir.magnitude < 0.05f ? Vector3.zero : rawDir.normalized;
-
+            
             _move = Input.GetButtonDown("Move_" + _controllerName);
             _shoot = Input.GetButtonDown("Fire_" + _controllerName);
+            
+            // A direction input was recieved
+            if (h != 0 || v != 0) {
+                PositionDirectionArrowForDirection(_moveDir);
+                _directionArrow.GetComponent<MeshRenderer>().enabled = true;
+            }
+        }
+        else {
+            _directionArrow.GetComponent<MeshRenderer>().enabled = false;
         }
     }
 
