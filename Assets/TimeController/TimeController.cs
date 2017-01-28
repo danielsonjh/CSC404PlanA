@@ -36,6 +36,7 @@ public class TimeController : NetworkBehaviour
 
 	void Start ()
 	{
+        LightController.Instance.SetOnToggleListener();
 	    _prevRealtime = Time.realtimeSinceStartup;
 
         StartCoroutine(UnscaledUpdate());

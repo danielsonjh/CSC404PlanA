@@ -3,14 +3,24 @@ using UnityEngine;
 
 public class LightController : MonoBehaviour
 {
+    public static LightController Instance;
+
     private const float FadeDuration = 0.2f;
 
     private Light _light;
 
+    void Awake()
+    {
+        Instance = this;
+    }
+
     void Start()
     {
         _light = GetComponent<Light>();
+    }
 
+    public void SetOnToggleListener()
+    {
         TimeController.Instance.OnToggle += Fade;
     }
 
