@@ -6,7 +6,7 @@ using UnityEngine.Networking;
 public class Player : NetworkBehaviour
 {
     public static readonly string[] ControllerNames = { "PC", "J1" };
-
+    
     public GameObject FireballPrefab;
     public GameObject DirectionArrowPrefab;
 
@@ -18,9 +18,10 @@ public class Player : NetworkBehaviour
 
     private GameObject _indicatorContainer;
     private GameObject _directionIndicator;
+    private PlayerActionHud _playerActionHud;
     private string _controllerName;
     private Vector3 _rawAxes;
-    private PlayerAction[] _actions = new PlayerAction[1];
+    private PlayerAction[] _actions = new PlayerAction[2];
 
     void Start ()
     {
@@ -29,6 +30,7 @@ public class Player : NetworkBehaviour
             RegisterPrefabs();
             InitializeIndicators();
             SetupControllers();
+            _playerActionHud = GetComponentInChildren<PlayerActionHud>();
 
             TimeController.Instance.OnToggle += OnTimeControllerToggleHandler;
         }
@@ -88,10 +90,13 @@ public class Player : NetworkBehaviour
     {
         if (TimeController.Instance.IsFreeze)
         {
-            var h = Input.GetAxisRaw("Horizontal_" + _controllerName);
-            var v = Input.GetAxisRaw("Vertical_" + _controllerName);
-            _rawAxes = new Vector3(h, 0, v);
-            
+            if (_actions.All(i => i == PlayerAction.Empty))
+            {
+                var h = Input.GetAxisRaw("Horizontal_" + _controllerName);
+                var v = Input.GetAxisRaw("Vertical_" + _controllerName);
+                _rawAxes = new Vector3(h, 0, v);
+            }
+
             if (Input.GetButtonDown("Move_" + _controllerName))
             {
                 AddAction(PlayerAction.Move);
@@ -111,7 +116,8 @@ public class Player : NetworkBehaviour
         {
             if (_actions[i] == PlayerAction.Empty)
             {
-                _actions[i] = action;
+                SetAction(action, i);
+                break;
             }
         }
     }
@@ -125,8 +131,14 @@ public class Player : NetworkBehaviour
     {
         for (var i = 0; i < _actions.Length; i++)
         {
-            _actions[i] = PlayerAction.Empty;
+            SetAction(PlayerAction.Empty, i);
         }
+    }
+
+    private void SetAction(PlayerAction action, int index)
+    {
+        _actions[index] = action;
+        _playerActionHud.AddAction(action, index);
     }
 
     private void UpdateRotation()
@@ -142,14 +154,14 @@ public class Player : NetworkBehaviour
     {
         if (TimeController.Instance.IsMove)
         {
-            if (IsSelectedAction(PlayerAction.Move))
+            if (IsSelectedAction(PlayerAction.Move, PlayerAction.Empty))
             {
                 var thisRigidbody = GetComponent<Rigidbody>();
                 thisRigidbody.velocity = Vector3.zero;
                 thisRigidbody.AddForce(MoveDir * MoveForce, ForceMode.Impulse);
                 transform.rotation = Quaternion.LookRotation(LookDir);
             }
-            else if (IsSelectedAction(PlayerAction.Fire))
+            else if (IsSelectedAction(PlayerAction.Fire, PlayerAction.Empty))
             {
                 var fireball = Instantiate(FireballPrefab, transform.position, transform.rotation);
                 fireball.GetComponent<Rigidbody>().velocity = LookDir * FireballSpeed;

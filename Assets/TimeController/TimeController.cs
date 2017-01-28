@@ -12,7 +12,7 @@ public class TimeController : NetworkBehaviour
     public event Action OnToggle;
 
     public const float MoveTime = 0.5f;
-    public const float FreezeTime = 0.75f;
+    public const float FreezeTime = 1.0f;
 
     public bool IsMove { get { return _state == TimeState.Move; } }
     public bool IsFreeze { get { return _state == TimeState.Freeze; } }
