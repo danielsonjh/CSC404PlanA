@@ -14,12 +14,12 @@ public class LightController : MonoBehaviour
         TimeController.Instance.OnToggle += Fade;
     }
 
-    void Fade()
+    private void Fade()
     {
         StartCoroutine(TimeController.Instance.IsMove ? FadeCoroutine(1) : FadeCoroutine(0.7f));
     }
 
-    IEnumerator FadeCoroutine(float target)
+    private IEnumerator FadeCoroutine(float target)
     {
         var origIntensity = _light.intensity;
         var t = 0f;

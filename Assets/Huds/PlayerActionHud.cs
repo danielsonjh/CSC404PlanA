@@ -20,6 +20,7 @@ public class PlayerActionHud : MonoBehaviour
         for (var i = 0; i < transform.childCount; i++)
         {
             _actionButtons[i] = transform.GetChild(i).gameObject;
+            AddAction(PlayerAction.Empty, i);
         }
     }
     

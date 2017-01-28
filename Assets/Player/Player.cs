@@ -5,13 +5,14 @@ using UnityEngine.Networking;
 
 public class Player : NetworkBehaviour
 {
-    public static readonly string[] ControllerNames = { "PC", "J1" };
-    
     public GameObject FireballPrefab;
     public GameObject DirectionArrowPrefab;
 
     private const float MoveForce = 40f;
     private const float FireballSpeed = 10f;
+
+    private static readonly string[] ControllerNames = { "PC", "J1" };
+    private static int _localPlayerCount = 0;
 
     private Vector3 LookDir { get { return _rawAxes.normalized; } }
     private Vector3 MoveDir { get { return _rawAxes.magnitude < 0.05f ? Vector3.zero : _rawAxes.normalized; } }
@@ -25,14 +26,20 @@ public class Player : NetworkBehaviour
 
     void Start ()
     {
+        TimeController.Instance.OnToggle += OnTimeControllerToggleHandler;
+
         if (isClient)
         {
-            RegisterPrefabs();
-            InitializeIndicators();
-            SetupControllers();
-            _playerActionHud = GetComponentInChildren<PlayerActionHud>();
+            InitializeHuds();
 
-            TimeController.Instance.OnToggle += OnTimeControllerToggleHandler;
+            if (isLocalPlayer)
+            {
+                SetupControllers();
+            }
+            else
+            {
+                HideHuds();
+            }
         }
     }
 
@@ -46,31 +53,33 @@ public class Player : NetworkBehaviour
             UpdateIndicators();
         }
     }
-
-    private void RegisterPrefabs()
-    {
-        ClientScene.RegisterPrefab(FireballPrefab);
-    }
-
-    private void InitializeIndicators()
+    
+    private void InitializeHuds()
     {
         _indicatorContainer = transform.FindChild("IndicatorContainer").gameObject;
         _directionIndicator = _indicatorContainer.transform.FindChild("DirectionIndicator").gameObject;
+        _playerActionHud = GetComponentInChildren<PlayerActionHud>();
     }
 
     private void SetupControllers()
     {
-        _controllerName = ControllerNames[playerControllerId];
+        _localPlayerCount++;
+        _controllerName = ControllerNames[_localPlayerCount - 1];
         Debug.Log("Adding Controller: " + _controllerName);
 
-        var isFirstPlayer = playerControllerId == 0;
-        if (isFirstPlayer)
+        if (_localPlayerCount == 1)
         {
             if (Input.GetJoystickNames().Length > 0)
             {
                 ClientScene.AddPlayer(1);
             }
         }
+    }
+
+    private void HideHuds()
+    {
+        _indicatorContainer.SetActive(false);
+        GetComponentInChildren<PlayerHud>().gameObject.SetActive(false);
     }
 
     private void UpdateIndicators()
@@ -138,7 +147,10 @@ public class Player : NetworkBehaviour
     private void SetAction(PlayerAction action, int index)
     {
         _actions[index] = action;
-        _playerActionHud.AddAction(action, index);
+        if (_playerActionHud.isActiveAndEnabled)
+        {
+            _playerActionHud.AddAction(action, index);
+        }
     }
 
     private void UpdateRotation()
@@ -154,24 +166,26 @@ public class Player : NetworkBehaviour
     {
         if (TimeController.Instance.IsMove)
         {
-            if (IsSelectedAction(PlayerAction.Move, PlayerAction.Empty))
+            if (isServer)
             {
-                var thisRigidbody = GetComponent<Rigidbody>();
-                thisRigidbody.velocity = Vector3.zero;
-                thisRigidbody.AddForce(MoveDir * MoveForce, ForceMode.Impulse);
-                transform.rotation = Quaternion.LookRotation(LookDir);
-            }
-            else if (IsSelectedAction(PlayerAction.Fire, PlayerAction.Empty))
-            {
-                var fireball = Instantiate(FireballPrefab, transform.position, transform.rotation);
-                fireball.GetComponent<Rigidbody>().velocity = LookDir * FireballSpeed;
-                NetworkServer.Spawn(fireball);
+                if (IsSelectedAction(PlayerAction.Move, PlayerAction.Empty))
+                {
+                    var thisRigidbody = GetComponent<Rigidbody>();
+                    thisRigidbody.velocity = Vector3.zero;
+                    thisRigidbody.AddForce(MoveDir * MoveForce, ForceMode.Impulse);
+                    transform.rotation = Quaternion.LookRotation(LookDir);
+                }
+                else if (IsSelectedAction(PlayerAction.Fire, PlayerAction.Empty))
+                {
+                    var fireball = Instantiate(FireballPrefab, transform.position, transform.rotation);
+                    fireball.GetComponent<Rigidbody>().velocity = LookDir * FireballSpeed;
+                    NetworkServer.Spawn(fireball);
+                }
             }
 
             ClearActions();
         }
     }
-
     [Command]
     private void CmdSendInputs(Vector3 rawAxes, string[] actionsString)
     {
