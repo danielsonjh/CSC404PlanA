@@ -28,23 +28,12 @@ public class Player : NetworkBehaviour
     {
         if (isClient)
         {
-            _indicatorContainer = transform.FindChild("IndicatorContainer").gameObject;
-            _directionIndicator = _indicatorContainer.transform.FindChild("DirectionIndicator").gameObject;
-
-            _controllerName = ControllerNames[playerControllerId];
-            Debug.Log("Adding Controller: " + _controllerName);
             StartCoroutine(UnscaledUpdate());
+            RegisterPrefabs();
+            InitializeIndicators();
+            SetupControllers();
+
             TimeController.Instance.OnToggle += OnTimeControllerToggleHandler;
-
-            if (playerControllerId == 0)
-            {
-                RegisterPrefabs();
-
-                if (Input.GetJoystickNames().Length > 0)
-                {
-                    ClientScene.AddPlayer(1);
-                }
-            }
         }
     }
 
@@ -58,7 +47,7 @@ public class Player : NetworkBehaviour
         UpdateRotation();
     }
 
-    IEnumerator UnscaledUpdate()
+    private IEnumerator UnscaledUpdate()
     {
         while (true)
         {
@@ -84,6 +73,27 @@ public class Player : NetworkBehaviour
     private void RegisterPrefabs()
     {
         ClientScene.RegisterPrefab(FireballPrefab);
+    }
+
+    private void InitializeIndicators()
+    {
+        _indicatorContainer = transform.FindChild("IndicatorContainer").gameObject;
+        _directionIndicator = _indicatorContainer.transform.FindChild("DirectionIndicator").gameObject;
+    }
+
+    private void SetupControllers()
+    {
+        _controllerName = ControllerNames[playerControllerId];
+        Debug.Log("Adding Controller: " + _controllerName);
+
+        var isFirstPlayer = playerControllerId == 0;
+        if (isFirstPlayer)
+        {
+            if (Input.GetJoystickNames().Length > 0)
+            {
+                ClientScene.AddPlayer(1);
+            }
+        }
     }
 
     private void RotateIndicators(Vector3 direction)
