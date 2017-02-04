@@ -12,7 +12,7 @@ public class TimeController : NetworkBehaviour
     public event Action OnToggle;
 
     public const float MoveTime = 0.5f;
-    public const float FreezeTime = 1.0f;
+    public const float FreezeTime = 2.0f;
 
     public bool IsMove { get { return _state == TimeState.Move; } }
     public bool IsFreeze { get { return _state == TimeState.Freeze; } }
@@ -74,7 +74,7 @@ public class TimeController : NetworkBehaviour
     private void ToggleTimeState()
     {
         _state = _state.Other();
-        Time.timeScale = IsMove ? 1 : 0.1f;
+        Time.timeScale = IsMove ? 1 : 0.05f;
         Bar.GetComponent<MeshRenderer>().material = IsMove ? MoveBarMaterial : FreezeBarMaterial;
         _counter = 0;
 

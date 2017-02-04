@@ -1,4 +1,4 @@
 ﻿public enum PlayerAction
 {
-    Empty, Move, Fire
+    Empty, Fire, Water, Wind, Earth
 }

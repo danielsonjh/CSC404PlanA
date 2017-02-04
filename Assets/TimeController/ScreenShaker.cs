@@ -6,7 +6,7 @@ public class ScreenShaker : MonoBehaviour
     private float _shake = 0;
     private float _shakeAmount = 0.2f;
     private float _dampingFactor = 15f;
-    private float _scaleAmount = 0.5f;
+    private float _scaleAmount = 0.25f;
 
     private Vector3 _originalPos;
     private float _originalSize;

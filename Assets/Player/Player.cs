@@ -6,22 +6,15 @@ using UnityEngine.Networking;
 public class Player : NetworkBehaviour
 {
     public GameObject FireballPrefab;
-    public GameObject DirectionArrowPrefab;
+
+    public Vector3 MoveDirection;
+    public Vector3 ActionDirection;
 
     private const float MoveForce = 40f;
     private const float FireballSpeed = 10f;
-
-    private static readonly string[] ControllerNames = { "PC", "J1" };
-    private static int _localPlayerCount = 0;
-
-    private Vector3 LookDir { get { return _rawAxes.normalized; } }
-    private Vector3 MoveDir { get { return _rawAxes.magnitude < 0.05f ? Vector3.zero : _rawAxes.normalized; } }
-
-    private GameObject _indicatorContainer;
-    private GameObject _directionIndicator;
+    private GameObject _moveDirectionIndicator;
+    private GameObject _actionDirectionIndicator;
     private PlayerActionHud _playerActionHud;
-    private string _controllerName;
-    private Vector3 _rawAxes;
     private PlayerAction[] _actions = new PlayerAction[2];
 
     void Start ()
@@ -32,11 +25,7 @@ public class Player : NetworkBehaviour
         {
             InitializeHuds();
 
-            if (isLocalPlayer)
-            {
-                SetupControllers();
-            }
-            else
+            if (!isLocalPlayer)
             {
                 HideHuds();
             }
@@ -45,81 +34,14 @@ public class Player : NetworkBehaviour
 
     void Update()
     {
-        UpdateRotation();
-
         if (isLocalPlayer)
         {
-            ProcessInput();
             UpdateIndicators();
-        }
-    }
-    
-    private void InitializeHuds()
-    {
-        _indicatorContainer = transform.FindChild("IndicatorContainer").gameObject;
-        _directionIndicator = _indicatorContainer.transform.FindChild("DirectionIndicator").gameObject;
-        _playerActionHud = GetComponentInChildren<PlayerActionHud>();
-    }
-
-    private void SetupControllers()
-    {
-        _localPlayerCount++;
-        _controllerName = ControllerNames[_localPlayerCount - 1];
-        Debug.Log("Adding Controller: " + _controllerName);
-
-        if (_localPlayerCount == 1)
-        {
-            if (Input.GetJoystickNames().Length > 0)
-            {
-                ClientScene.AddPlayer(1);
-            }
+            CmdSendInputs(MoveDirection, ActionDirection, _actions.Select(i => i.ToString()).ToArray());
         }
     }
 
-    private void HideHuds()
-    {
-        _indicatorContainer.SetActive(false);
-        GetComponentInChildren<PlayerHud>().gameObject.SetActive(false);
-    }
-
-    private void UpdateIndicators()
-    {
-        if (TimeController.Instance.IsFreeze && MoveDir != Vector3.zero)
-        {
-            _indicatorContainer.transform.rotation = Quaternion.LookRotation(LookDir);
-            _directionIndicator.GetComponent<MeshRenderer>().enabled = true;
-        }
-        else
-        {
-            _directionIndicator.GetComponent<MeshRenderer>().enabled = false;
-        }
-    }
-
-    private void ProcessInput()
-    {
-        if (TimeController.Instance.IsFreeze)
-        {
-            if (_actions.All(i => i == PlayerAction.Empty))
-            {
-                var h = Input.GetAxisRaw("Horizontal_" + _controllerName);
-                var v = Input.GetAxisRaw("Vertical_" + _controllerName);
-                _rawAxes = new Vector3(h, 0, v);
-            }
-
-            if (Input.GetButtonDown("Move_" + _controllerName))
-            {
-                AddAction(PlayerAction.Move);
-            }
-            if (Input.GetButtonDown("Fire_" + _controllerName))
-            {
-                AddAction(PlayerAction.Fire);
-            }
-            
-            CmdSendInputs(_rawAxes, _actions.Select(i => i.ToString()).ToArray());
-        }
-    }
-
-    private void AddAction(PlayerAction action)
+    public void AddAction(PlayerAction action)
     {
         for (var i = 0; i < _actions.Length; i++)
         {
@@ -128,6 +50,42 @@ public class Player : NetworkBehaviour
                 SetAction(action, i);
                 break;
             }
+        }
+    }
+
+    private void InitializeHuds()
+    {
+        _moveDirectionIndicator = transform.FindChild("MoveDirectionIndicator").gameObject;
+        _actionDirectionIndicator = transform.FindChild("ActionDirectionIndicator").gameObject;
+        _playerActionHud = GetComponentInChildren<PlayerActionHud>();
+    }
+
+    private void HideHuds()
+    {
+        _moveDirectionIndicator.SetActive(false);
+        _actionDirectionIndicator.SetActive(false);
+        GetComponentInChildren<PlayerHud>().gameObject.SetActive(false);
+    }
+
+    private void UpdateIndicators()
+    {
+        if (TimeController.Instance.IsFreeze)
+        {
+            if (MoveDirection != Vector3.zero)
+            {
+                _moveDirectionIndicator.transform.rotation = Quaternion.LookRotation(MoveDirection);
+                _moveDirectionIndicator.GetComponentInChildren<MeshRenderer>().enabled = true;
+            }
+            if (ActionDirection != Vector3.zero)
+            {
+                _actionDirectionIndicator.transform.rotation = Quaternion.LookRotation(ActionDirection);
+                _actionDirectionIndicator.GetComponentInChildren<MeshRenderer>().enabled = true;
+            }
+        }
+        else
+        {
+            _moveDirectionIndicator.GetComponentInChildren<MeshRenderer>().enabled = false;
+            _actionDirectionIndicator.GetComponentInChildren<MeshRenderer>().enabled = false;
         }
     }
 
@@ -152,44 +110,51 @@ public class Player : NetworkBehaviour
             _playerActionHud.AddAction(action, index);
         }
     }
-
-    private void UpdateRotation()
-    {
-        var lookDir = GetComponent<Rigidbody>().velocity;
-        if (lookDir != Vector3.zero)
-        {
-            transform.rotation = Quaternion.LookRotation(lookDir);
-        }
-    }
-
+    
     private void OnTimeControllerToggleHandler()
     {
         if (TimeController.Instance.IsMove)
         {
             if (isServer)
             {
-                if (IsSelectedAction(PlayerAction.Move, PlayerAction.Empty))
+                if (ActionDirection != Vector3.zero)
+                {
+                    transform.rotation = Quaternion.LookRotation(ActionDirection);
+                    
+                    if (IsSelectedAction(PlayerAction.Fire, PlayerAction.Empty))
+                    {
+                        var fireball = Instantiate(FireballPrefab, transform.position, transform.rotation);
+                        fireball.GetComponent<Rigidbody>().velocity = ActionDirection * FireballSpeed;
+                        NetworkServer.Spawn(fireball);
+                    }
+                    else if (IsSelectedAction(PlayerAction.Fire, PlayerAction.Fire))
+                    {
+                        var fireball = Instantiate(FireballPrefab, transform.position, transform.rotation);
+                        fireball.GetComponent<Rigidbody>().velocity = ActionDirection * FireballSpeed;
+                        fireball.transform.localScale *= 2;
+                        NetworkServer.Spawn(fireball);
+                    }
+                }
+
+                if (MoveDirection != Vector3.zero)
                 {
                     var thisRigidbody = GetComponent<Rigidbody>();
                     thisRigidbody.velocity = Vector3.zero;
-                    thisRigidbody.AddForce(MoveDir * MoveForce, ForceMode.Impulse);
-                    transform.rotation = Quaternion.LookRotation(LookDir);
-                }
-                else if (IsSelectedAction(PlayerAction.Fire, PlayerAction.Empty))
-                {
-                    var fireball = Instantiate(FireballPrefab, transform.position, transform.rotation);
-                    fireball.GetComponent<Rigidbody>().velocity = LookDir * FireballSpeed;
-                    NetworkServer.Spawn(fireball);
+                    thisRigidbody.AddForce(MoveDirection * MoveForce, ForceMode.Impulse);
                 }
             }
 
+            MoveDirection = Vector3.zero;
+            ActionDirection = Vector3.zero;
             ClearActions();
         }
     }
+
     [Command]
-    private void CmdSendInputs(Vector3 rawAxes, string[] actionsString)
+    private void CmdSendInputs(Vector3 moveDirection, Vector3 actionDirection, string[] actionsString)
     {
-        _rawAxes = rawAxes;
+        MoveDirection = moveDirection;
+        ActionDirection = actionDirection;
         _actions = actionsString.Select(i => (PlayerAction) Enum.Parse(typeof(PlayerAction), i)).ToArray();
     }
 }
